@@ -2,9 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class AnimationController : MonoBehaviour
+public class AnimationController 
 {
-    const float DELTA_TIME_MAX = 1.0f;
     float _time = 0.0f;
     float _inv_time_max = 1.0f;
 
@@ -17,24 +16,16 @@ public class AnimationController : MonoBehaviour
     }
 
 
-    public bool Update(float delta_time)
+    public bool Update()
     {
-        if (DELTA_TIME_MAX < delta_time) delta_time = DELTA_TIME_MAX;
-
-        _time -= delta_time;
-
-
-        if (_time <= 0.0f) 
-        {
-            _time = 0.0f;
-            return false;
-        }
+        _time = Mathf.Max(--_time, 0);
+        return (0 < _time);
 
         return true;
     }
 
     public float GetNormalized()
     {
-        return _time * _inv_time_max;
+        return _time * (float)_time;
     }
 }

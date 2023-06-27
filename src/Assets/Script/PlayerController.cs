@@ -4,8 +4,8 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    const float TRANS_TIME = 0.05f;
-    const float ROT_TIME = 0.05f;
+    const int TRANS_TIME = 3;
+    const int ROT_TIME = 3;
 
     enum RotState
     {
@@ -28,6 +28,8 @@ public class PlayerController : MonoBehaviour
     AnimationController _animationController = new AnimationController();
     Vector2Int _last_position;
     RotState _last_rotate = RotState.Up;
+
+    LogicalInput logicalInput = new();
     void Start()
     {
 
@@ -145,7 +147,32 @@ public class PlayerController : MonoBehaviour
 
         gameObject.SetActive(false);
     }
-    // Update is called once per frame
+
+    static readonly KeyCode[] key_code_tbl = new KeyCode[(int)LogicalInput.Key.MAX]
+    {
+        KeyCode.RightArrow,
+        KeyCode.LeftArrow,
+        KeyCode.X,
+        KeyCode.Z,
+        KeyCode.UpArrow,
+        KeyCode.DownArrow,
+    };
+
+    void UpdateInput()
+    {
+        LogicalInput.Key inputDev = 0;
+
+        for (int i=0;i<(int)LogicalInput.Key.MAX;i++)
+        {
+            if(Input.GetKey(key_code_tbl[i]))
+            {
+                inputDev |= (LogicalInput.Key)(1 << i);
+            }
+        }
+
+        logicalInput.Update(inputDev);
+    }
+
     void Control()
     {
         if(Input.GetKeyDown(KeyCode.RightArrow))
@@ -172,9 +199,11 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    void Update()
+    
+
+    void FixedUpdate()
     {
-        if(!_animationController.Update(Time.deltaTime))
+        if(!_animationController.Update())
         {
             Control();
         }
