@@ -20,12 +20,13 @@ public class AnimationController
     {
         _time = Mathf.Max(--_time, 0);
         return (0 < _time);
-
-        return true;
     }
 
     public float GetNormalized()
     {
         return _time * (float)_time;
     }
+
+
+    
 }
