@@ -38,7 +38,9 @@ public class PlayerController : MonoBehaviour
     Vector2Int _last_position;
     RotState _last_rotate = RotState.Up;
 
-    LogicalInput logicalInput = new();
+    uint _additiveScore = 0;
+
+
     void Start()
     {
         gameObject.SetActive(false);// ぷよの種類が設定されるまで眠る
@@ -217,6 +219,7 @@ public class PlayerController : MonoBehaviour
             _last_position += Vector2Int.down;
             _fallCount += FALL_COUNT_UNIT;
         }
+        if (is_fast) _additiveScore++;
 
         return true;
     }
@@ -224,29 +227,33 @@ public class PlayerController : MonoBehaviour
 
     void Control()
     {
-        if (!Fall(logicalInput.IsRaw(LogicalInput.Key.Down))) return;
+        if (!Fall(_logicalInput.IsRaw(LogicalInput.Key.Down))) return;// 接地したら終了
 
+        // アニメ中はキー入力を受け付けない
         if (_animationController.Update()) return;
 
-        if (Input.GetKeyDown(KeyCode.RightArrow))
+        // 平行移動のキー入力取得
+        if (_logicalInput.IsRepeat(LogicalInput.Key.Right))
         {
-            if(Translate(true)) return;
+            if (Translate(true)) return;
         }
-        if(Input.GetKeyDown(KeyCode.LeftArrow))
+        if (_logicalInput.IsRepeat(LogicalInput.Key.left))
         {
-            if(Translate(false)) return;
-        }
-
-        if(Input.GetKeyDown(KeyCode.X))
-        {
-            if(Rotate(true)) return;
-        }
-        if(Input.GetKeyDown(KeyCode.Z))
-        {
-            if(Rotate(false)) return;
+            if (Translate(false)) return;
         }
 
-        if(Input.GetKey(KeyCode.UpArrow))
+        // 回転のキー入力取得
+        if (_logicalInput.IsTrigger(LogicalInput.Key.RotR))// 右回転
+        {
+            if (Rotate(true)) return;
+        }
+        if (_logicalInput.IsTrigger(LogicalInput.Key.RotL))// 左回転
+        {
+            if (Rotate(false)) return;
+        }
+
+        // クイックドロップのキー入力取得
+        if (_logicalInput.IsRelease(LogicalInput.Key.QuickDrop))
         {
             QuickDrop();
         }
@@ -285,5 +292,13 @@ public class PlayerController : MonoBehaviour
         theta = theta0 + rate * theta0;
 
         return p + new Vector3(Mathf.Sin(theta), Mathf.Cos(theta), 0.0f);
+    }
+
+    public uint popScore()
+    {
+        uint score = _additiveScore;
+        _additiveScore = 0;
+
+        return score;
     }
 }

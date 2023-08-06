@@ -26,8 +26,15 @@ public class BoardController : MonoBehaviour
     GameObject[,] _Puyos = new GameObject[BOARD_HEIGHT, BOARD_WIDTH];
 
 
+    uint _additiveScore = 0;
+
+
     List<FallData> _falls = new();
     int _fallFrames = 0;
+
+
+    List<Vector2Int> _erases = new();
+    int _eraseFrames = 0;
 
 
     private void ClearAll()
@@ -143,5 +150,137 @@ public class BoardController : MonoBehaviour
         }
 
         return _falls.Count != 0;
+    }
+
+
+    static readonly uint[] chainBonusTbl = new uint[] {
+        0, 8, 16, 32, 64,
+        96, 128, 160, 192, 224,
+        256, 288, 320, 352, 384,
+        416, 448, 480, 512 };
+
+    static readonly uint[] connectBonusTbl = new uint[] {
+        0, 0, 0, 0, 0, 2, 3, 4, 5, 6, 7,
+    };
+
+    static readonly uint[] colorBonusTbl = new uint[] {
+        0, 3, 6, 12, 24,
+    };
+
+
+    static readonly Vector2Int[] search_tbl = new Vector2Int[] { Vector2Int.up, Vector2Int.right, Vector2Int.down, Vector2Int.left };
+    // 消えるぷよを検索する（同じ色を上下左右に見つけていく。見つけたらフラグを立てて再計算しない）
+    public bool CheckErase(int chainCount)
+    {
+        _eraseFrames = 0;
+        _erases.Clear();
+
+        uint[] isChecked = new uint[BOARD_HEIGHT];// メモリを多く使うのは無駄なのでビット処理
+
+        // 得点計算用
+        int puyoCount = 0;
+        uint colorBits = 0;
+        uint connectBonus = 0;
+
+        List<Vector2Int> add_list = new();
+        for (int y = 0; y < BOARD_HEIGHT; y++)
+        {
+            for (int x = 0; x < BOARD_WIDTH; x++)
+            {
+                if ((isChecked[y] & (1u << x)) != 0) continue;// 調査済み
+
+                isChecked[y] |= (1u << x);
+
+                int type = _board[y, x];
+                if (type == 0) continue;// 空間だった
+
+                puyoCount++;
+
+                System.Action<Vector2Int> get_connection = null;// 再帰で使う場合に必要
+                get_connection = (pos) =>
+                {
+                    add_list.Add(pos);// 削除対象とする
+
+                    foreach (Vector2Int d in search_tbl)
+                    {
+                        Vector2Int target = pos + d;
+                        if (target.x < 0 || BOARD_WIDTH <= target.x ||
+                            target.y < 0 || BOARD_HEIGHT <= target.y) continue;// 範囲外
+                        if (_board[target.y, target.x] != type) continue;// 色違い
+                        if ((isChecked[target.y] & (1u << target.x)) != 0) continue;// 検索済み
+
+                        isChecked[target.y] |= (1u << target.x);
+                        get_connection(target);
+                    }
+                };
+
+                add_list.Clear();
+                get_connection(new Vector2Int(x, y));
+
+                if (4 <= add_list.Count)
+                {
+                    connectBonus += connectBonusTbl[System.Math.Min(add_list.Count, connectBonusTbl.Length - 1)];
+                    colorBits |= (1u << type);
+                    _erases.AddRange(add_list);
+                }
+            }
+        }
+
+        if (chainCount != -1)// 初期化時は得点計算はしない
+        {
+            // ボーナス計算
+            uint colorNum = 0;
+            for (; 0 < colorBits; colorBits >>= 1)// 立っているビットの数を数える
+            {
+                colorNum += (colorBits & 1u);
+            }
+
+            uint colorBonus = colorBonusTbl[System.Math.Min(colorNum, colorBonusTbl.Length - 1)];
+            uint chainBonus = chainBonusTbl[System.Math.Min(chainCount, chainBonusTbl.Length - 1)];
+            uint bonus = System.Math.Max(1, chainBonus + connectBonus + colorBonus);// 0 の時も1入る
+            _additiveScore += 10 * (uint)_erases.Count * bonus;
+
+            if (puyoCount == 0) _additiveScore += 1800;// 全消しボーナス
+        }
+
+        return _erases.Count != 0;
+    }
+
+    public bool Erase()
+    {
+        _eraseFrames++;
+
+        // 1から増えてちょっとしたら最大に大きくなったあと小さくなって消える
+        float t = _eraseFrames * Time.deltaTime;
+        t = 1.0f - 10.0f * ((t - 0.1f) * (t - 0.1f) - 0.1f * 0.1f);
+
+        // 大きさが負ならおしまい
+        if (t <= 0.0f)
+        {
+            // データとゲームオブジェクトをここで消す
+            foreach (Vector2Int d in _erases)
+            {
+                Destroy(_Puyos[d.y, d.x]);
+                _Puyos[d.y, d.x] = null;
+                _board[d.y, d.x] = 0;
+            }
+
+            return false;
+        }
+
+        // モデルの大きさを変える
+        foreach (Vector2Int d in _erases)
+        {
+            _Puyos[d.y, d.x].transform.localScale = Vector3.one * t;
+        }
+
+        return true;
+    }
+    public uint popScore()
+    {
+        uint score = _additiveScore;
+        _additiveScore = 0;
+
+        return score;
     }
 }
