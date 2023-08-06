@@ -27,7 +27,8 @@ public class PlayerController : MonoBehaviour
 
     [SerializeField] PuyoController[] _puyoControllers = new PuyoController[2] { default!, default! };
     [SerializeField] BoardController boardController = default!;
-    
+    LogicalInput _logicalInput = null;
+
 
     Vector2Int _position;
     RotState _rotate = RotState.Up;
@@ -40,19 +41,42 @@ public class PlayerController : MonoBehaviour
     LogicalInput logicalInput = new();
     void Start()
     {
+        gameObject.SetActive(false);// ぷよの種類が設定されるまで眠る
+    }
 
-        logicalInput.Clear();
+    public void SetLogicalInput(LogicalInput reference)
+    {
+        _logicalInput = reference;
+    }
 
-        // ひとまず決め打ちで色を決定
-        _puyoControllers[0].SetPuyoType(PuyoType.Green);
-        _puyoControllers[1].SetPuyoType(PuyoType.Red);
+    public bool Spawn(PuyoType axis, PuyoType child)
+    {
+        // 初期位置に出せるか確認
+        Vector2Int position = new(2, 12);// 初期位置
+        RotState rotate = RotState.Up;// 最初は上向き
+        if (!CanMove(position, rotate)) return false;
+
+        // パラメータの初期化
+        _position = _last_position = position;
+        _rotate = _last_rotate = rotate;
+        _animationController.Set(1);
+        _fallCount = 0;
+        _groundFrame = GROUND_FRAMES;
+
+        // ぷよをだす
+        _puyoControllers[0].SetPuyoType(axis);
+        _puyoControllers[1].SetPuyoType(child);
 
         _puyoControllers[0].SetPos(new Vector3((float)_position.x, (float)_position.y, 0.0f));
         Vector2Int posChild = CalcChildPuyoPos(_position, _rotate);
         _puyoControllers[1].SetPos(new Vector3((float)posChild.x, (float)posChild.y, 0.0f));
+
+        gameObject.SetActive(true);
+
+        return true;
     }
 
-        static readonly Vector2Int[] rotate_tbl = new Vector2Int[]
+    static readonly Vector2Int[] rotate_tbl = new Vector2Int[]
     {Vector2Int.up, Vector2Int.right,Vector2Int.down,Vector2Int.left};
     private static Vector2Int CalcChildPuyoPos(Vector2Int pos,RotState rot)
     {
@@ -172,20 +196,7 @@ public class PlayerController : MonoBehaviour
         KeyCode.DownArrow,
     };
 
-    void UpdateInput()
-    {
-        LogicalInput.Key inputDev = 0;
 
-        for (int i=0;i<(int)LogicalInput.Key.MAX;i++)
-        {
-            if(Input.GetKey(key_code_tbl[i]))
-            {
-                inputDev |= (LogicalInput.Key)(1 << i);
-            }
-        }
-
-        logicalInput.Update(inputDev);
-    }
 
     bool Fall(bool is_fast)
     {
@@ -245,8 +256,6 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate()
     {
-        UpdateInput();
-
         Control();
 
         Vector3 dy = Vector3.up * (float)_fallCount / (float)FALL_COUNT_UNIT;
